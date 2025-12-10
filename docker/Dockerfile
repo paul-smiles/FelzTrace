@@ -15,6 +15,6 @@ WORKDIR /app
 # Optional: copy an entrypoint script that drops you in bash
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
+RUN echo "hello world from felztrace dev container"
 # Default: start an interactive shell (or run passed command)
 ENTRYPOINT ["/entrypoint.sh"]
