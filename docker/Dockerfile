@@ -15,6 +15,5 @@ WORKDIR /app
 # Optional: copy an entrypoint script that drops you in bash
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
 # Default: start an interactive shell (or run passed command)
 ENTRYPOINT ["/entrypoint.sh"]

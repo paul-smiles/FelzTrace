@@ -10,14 +10,14 @@ on:
       - 'include/**'
       - 'CMakeLists.txt'
       - 'docker/**'
-      - '.github/workflows/docker.yml'
+      - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'src/**'
       - 'include/**'
       - 'CMakeLists.txt'
       - 'docker/**'
-      - '.github/workflows/docker.yml'
+      - '.github/workflows/build.yml'
 
 jobs:
   docker-build-and-push:
@@ -34,32 +34,16 @@ jobs:
           fetch-depth: 2
 
       - name: Detect docker changes
-        id: changed
-        run: |
-          echo "Checking docker changes..."
-
-          if [ "${{ github.event_name }}" = "push" ]; then
-            base="${{ github.event.before }}"
-            head="${{ github.sha }}"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-            head="${{ github.event.pull_request.head.sha }}"
-          else
-            echo "Unsupported event: ${{ github.event_name }}"
-            echo "docker_changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if git diff --name-only "$base" "$head" \
-            | grep -qE '^docker/|\.github/workflows/docker\.yml'
-          then
-            echo "docker_changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "docker_changed=false" >> "$GITHUB_OUTPUT"
-          fi
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            docker:
+              - 'docker/**'
+              - '.github/workflows/build.yml'
           
       - name: Log in to GitHub Container Registry
-        if: steps.changed.outputs.docker_changed == 'true'
+        if: steps.changes.outputs.docker == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -67,11 +51,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
-        if: steps.changed.outputs.docker_changed == 'true'
+        if: steps.changes.outputs.docker == 'true'
         run: docker build -t "$IMAGE_NAME" -f docker/Dockerfile .
 
       - name: Push image (only on main)
-        if: steps.changed.outputs.docker_changed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.changes.outputs.docker == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: docker push "$IMAGE_NAME"
 
   check-image:
