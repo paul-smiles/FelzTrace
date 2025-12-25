@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 
+set(CMAKE_MESSAGE_LOG_LEVEL VERBOSE)
+
 project(FelzTrace
     VERSION 1.0 # Todo: flag for release pipeline to update this automatically
     LANGUAGES CXX
 )
+
+set(FETCHCONTENT_QUIET OFF)
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 20)
