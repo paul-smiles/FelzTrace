@@ -1,7 +1,8 @@
 name: docker and application build
 
 env: 
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/felztrace-dev:latest
+  DEV_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/felztrace-dev:latest
+  RUNTIME_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/felztrace-runtime:latest
 
 on:
   push:
@@ -52,73 +53,55 @@ jobs:
 
       - name: Build Docker image
         if: steps.changes.outputs.docker == 'true'
-        run: docker build -t "$IMAGE_NAME" -f docker/Dockerfile .
+        run: docker build --target builder -t "$DEV_IMAGE_NAME" -f docker/Dockerfile .
 
       - name: Push image (only on main)
         if: steps.changes.outputs.docker == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: docker push "$IMAGE_NAME"
+        run: docker push "$DEV_IMAGE_NAME"
 
-  check-image:
+  build-app:
+    needs: docker-build-and-push
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
-      packages: read   # allow reading GHCR metadata
-
-    outputs:
-      image_exists: ${{ steps.check.outputs.exists }}
-
-    steps:
-      - name: Check if image exists in Registry
-        id: check
-        run: |
-          OWNER="${{ github.repository_owner }}"
-          IMAGE_VERSION="latest"
-          IMAGE_NAME="felztrace-dev"
-          TOKEN="${{ secrets.GITHUB_TOKEN }}"
-
-          URL_CONTAINER="https://api.github.com/users/$OWNER/packages/container/${IMAGE_NAME}/versions"
-
-
-          echo "Checking Registry for image '${IMAGE_NAME}' with '${IMAGE_VERSION}' under owner '${OWNER}'..."
-
-          # Try container
-          RESP_USER=$(curl -s -H "Authorization: Bearer ${TOKEN}" -H "Accept: application/vnd.github+json" "${URL_CONTAINER}")
-          if echo ${RESP_USER} | grep -q "\"tags\": \[ \"${IMAGE_VERSION}\" \]"; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "Image not found in Registry."
-          echo "exists=false" >> "$GITHUB_OUTPUT"
-          exit 1
-
-      - name: Show result
-        run: echo "Image exists? ${{ steps.check.outputs.exists }}"
-
-  cmake-build:
-    needs: [docker-build-and-push, check-image]
-    if: needs.check-image.outputs.image_exists == 'true'
-    runs-on: ubuntu-latest
-
-    # Run this job inside the image from GHCR
-    container:
-      image: ghcr.io/${{ github.repository_owner }}/felztrace-dev:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
+      packages: write
+    
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Configure (CMake)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+    
+      - name: pull and and build app inside dev container
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          docker pull "$DEV_IMAGE_NAME"
+          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME"
+      
+      - name: build and push runtime container
+        run: |
+          docker build --target runtime -t "$RUNTIME_IMAGE_NAME" -f docker/Dockerfile .
+          docker push "$RUNTIME_IMAGE_NAME"
 
-      - name: Build
-        run: |
-          cmake --build build --config Release -- -j"$(nproc)"
+  test-app:
+    needs: build-app
+    runs-on: ubuntu-latest
+    
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/felztrace-runtime:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+  
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
 
       - name: Run app
         run: |
-          ./build/FelzTrace
+          /repository/FelzTrace
