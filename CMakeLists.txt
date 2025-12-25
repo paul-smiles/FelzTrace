@@ -36,6 +36,21 @@ set(SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
+target_compile_options(${PROJECT_NAME} PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Wshadow
+    -Wconversion
+    -Wsign-conversion
+    -Wformat=2
+    -Wnull-dereference
+)
+
+if(DEFINED ENV{CI})
+  target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
+endif()
+
 # Include headers
 target_include_directories(${PROJECT_NAME}
     PRIVATE
