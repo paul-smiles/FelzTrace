@@ -55,8 +55,8 @@ jobs:
         if: steps.changes.outputs.docker == 'true'
         run: docker build --target builder -t "$DEV_IMAGE_NAME" -f docker/Dockerfile .
 
-      - name: Push image (only on main)
-        if: steps.changes.outputs.docker == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Push image to GitHub Container Registry
+        if: steps.changes.outputs.docker == 'true' && github.event_name == 'push'
         run: docker push "$DEV_IMAGE_NAME"
 
   build-app:
@@ -89,24 +89,8 @@ jobs:
           docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME"
       
       - name: build and push runtime container
-        run: |
-          docker build --target runtime -t "$RUNTIME_IMAGE_NAME" -f docker/Dockerfile .
-          docker push "$RUNTIME_IMAGE_NAME"
-
-  test-app:
-    needs: build-app
-    runs-on: ubuntu-latest
-    
-    container:
-      image: ghcr.io/${{ github.repository_owner }}/felztrace-runtime:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-  
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Run app
-        run: |
-          /repository/FelzTrace
+        run: docker build --target runtime -t "$RUNTIME_IMAGE_NAME" -f docker/Dockerfile .
+          
+      - name: Push runtime image to GitHub Container Registry (only main branch)  
+        if: steps.changes.outputs.docker == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'  
+        run: docker push "$RUNTIME_IMAGE_NAME"
