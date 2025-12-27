@@ -7,7 +7,7 @@ project(FelzTrace
     LANGUAGES CXX
 )
 
-set(FETCHCONTENT_QUIET OFF)
+
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 20)
@@ -15,6 +15,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # strict C++ no extensions (e.g., no GNU extensions)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Enable clang-tidy for static analysis
+set(CMAKE_CXX_CLANG_TIDY clang-tidy)
+
+# FetchContent settings
+set(FETCHCONTENT_QUIET OFF)
 
 # ---------------------------------------------------------
 # Fetch spdlog
@@ -36,6 +42,7 @@ set(SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
+# Compiler warnings
 target_compile_options(${PROJECT_NAME} PRIVATE
     -Wall
     -Wextra
@@ -47,6 +54,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     -Wnull-dereference
 )
 
+# Treat warnings as errors in CI environment
 if(DEFINED ENV{CI})
   target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
 endif()
