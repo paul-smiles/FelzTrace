@@ -35,6 +35,18 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(spdlog)
 
+# ---------------------------------------------------------
+# Static analysis target using clang's scan-build
+# ---------------------------------------------------------
+add_custom_target(static-analyze
+  COMMAND scan-build
+          --status-bugs
+          -analyze-headers
+          -enable-checker core,unix,deadcode,cplusplus
+          cmake --build ${CMAKE_BINARY_DIR}
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Source files
 set(SOURCES
     src/main.cpp
