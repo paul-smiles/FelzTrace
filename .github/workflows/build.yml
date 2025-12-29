@@ -78,19 +78,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
     
-      - name: Check clang-format
-        run: |
-          git ls-files '*.cpp' '*.h' '*.hpp' \
-            | xargs clang-format --dry-run -Werror
-
-      - name: pull and and build app inside dev container
+      - name: pull dev container
         run: |
           docker pull "$DEV_IMAGE_NAME"
-          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME"
+
+      - name: check clang-format
+        run: |
+          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "git config --global --add safe.directory /repository; scripts/check-clang-format.sh"
+
+      - name: build application
+        run: |
+          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" scripts/build.sh
+
+      - name: run clang static analysis
+        run: |
+          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build --target static-analyze"
       
-      - name: build and push runtime container
+      - name: build runtime container
         run: docker build --target runtime -t "$RUNTIME_IMAGE_NAME" -f docker/Dockerfile .
           
-      - name: Push runtime image to GitHub Container Registry (only main branch)  
+      - name: Push runtime image (only main branch)  
         if: steps.changes.outputs.docker == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'  
         run: docker push "$RUNTIME_IMAGE_NAME"
