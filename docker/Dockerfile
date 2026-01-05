@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     clang-tools \
     clang-format \
     clang-tidy \
+    cppcheck \
     cmake \
     git \
     ca-certificates\

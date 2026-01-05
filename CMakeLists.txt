@@ -7,17 +7,12 @@ project(FelzTrace
     LANGUAGES CXX
 )
 
-
-
 # C++ standard
 set(CMAKE_CXX_STANDARD 20)
 # enforce the standard being used
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # strict C++ no extensions (e.g., no GNU extensions)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Enable clang-tidy for static analysis
-set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 # FetchContent settings
 set(FETCHCONTENT_QUIET OFF)
@@ -36,6 +31,32 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(spdlog)
 
 # ---------------------------------------------------------
+# Enable clang-tidy for static analysis
+# ---------------------------------------------------------
+find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+
+if(CLANG_TIDY_EXE)
+  file(GLOB_RECURSE CLANG_TIDY_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/*.cc
+    ${CMAKE_SOURCE_DIR}/src/*.cxx
+    ${CMAKE_SOURCE_DIR}/include/*.h
+    ${CMAKE_SOURCE_DIR}/include/*.hpp
+  )
+
+  add_custom_target(clang-tidy
+    COMMAND ${CLANG_TIDY_EXE}
+            -p=${CMAKE_BINARY_DIR}
+            ${CLANG_TIDY_SOURCES}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running clang-tidy (using .clang-tidy)"
+    VERBATIM
+  )
+else()
+  message(WARNING "clang-tidy not found — 'clang-tidy' target disabled")
+endif()
+
+# ---------------------------------------------------------
 # Static analysis target using clang's scan-build
 # ---------------------------------------------------------
 add_custom_target(static-analyze
@@ -44,6 +65,23 @@ add_custom_target(static-analyze
           -analyze-headers
           -enable-checker core,unix,deadcode,cplusplus
           cmake --build ${CMAKE_BINARY_DIR}
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# ---------------------------------------------------------
+# cppcheck target for static analysis
+# ---------------------------------------------------------
+# Disable cppcheck for spdlog (FetchContent)
+add_custom_target(cppcheck
+  COMMAND cppcheck
+          --project=${CMAKE_BINARY_DIR}/compile_commands.json
+          --enable=warning,style,performance,portability
+          --inconclusive
+          --inline-suppr
+          --suppress=missingIncludeSystem
+          --template=gcc
+          --error-exitcode=2
+          --suppress=*:*/_deps/*
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
