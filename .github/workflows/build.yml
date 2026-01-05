@@ -90,9 +90,17 @@ jobs:
         run: |
           docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" scripts/build.sh
 
+      - name: run clang-tidy analysis
+        run: |
+          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build --target clang-tidy"
+
       - name: run clang static analysis
         run: |
           docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build --target static-analyze"
+      
+      - name: run cppcheck analysis
+        run: |
+          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build --target cppcheck"
       
       - name: build runtime container
         run: docker build --target runtime -t "$RUNTIME_IMAGE_NAME" -f docker/Dockerfile .
