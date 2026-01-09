@@ -66,12 +66,13 @@ add_custom_target(static-analyze
           -enable-checker core,unix,deadcode,cplusplus
           cmake --build ${CMAKE_BINARY_DIR}
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  COMMENT "Running static analysis using clang's scan-build"
 )
 
 # ---------------------------------------------------------
 # cppcheck target for static analysis
 # ---------------------------------------------------------
-# Disable cppcheck for spdlog (FetchContent)
+# Suppress cppcheck findings for dependencies fetched into _deps (e.g., spdlog via FetchContent)
 add_custom_target(cppcheck
   COMMAND cppcheck
           --project=${CMAKE_BINARY_DIR}/compile_commands.json
@@ -83,6 +84,7 @@ add_custom_target(cppcheck
           --error-exitcode=2
           --suppress=*:*/_deps/*
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  COMMENT "Running cppcheck (using compile_commands.json)"
 )
 
 # Source files
