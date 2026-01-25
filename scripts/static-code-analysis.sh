@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-cmake --build build --target clang-tidy
-cmake --build build --target static-analyze
-cmake --build build --target cppcheck
+cmake --build build-release --target clang-tidy
+cmake --build build-release --target static-analyze
+cmake --build build-release --target cppcheck

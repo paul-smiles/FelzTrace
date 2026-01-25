@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cppcheck \
     cmake \
     git \
+    gcovr \
     ca-certificates \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -28,3 +29,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repository
+COPY ./build-release/FelzTrace /usr/local/bin/FelzTrace

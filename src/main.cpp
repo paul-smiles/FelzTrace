@@ -1,9 +1,12 @@
-#include <spdlog/spdlog.h>
+#include "cli.h"
+#include "core.h"
 
-int main()
+int main(int argc, const char* argv[])
 {
-    // Set global log level to info
-    spdlog::set_level(spdlog::level::info);
-    spdlog::info("FelzTrace: This is an info message!");
-    return 0;
+    int returnCode = felztrace::parse_cli(argc, argv);
+    if (returnCode == 0)
+    {
+        felztrace::run();
+    }
+    return returnCode;
 }
