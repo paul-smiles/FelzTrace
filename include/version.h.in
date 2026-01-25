@@ -1,0 +1,9 @@
+#pragma once
+
+#define FELZTRACE_COMMIT_HASH "@GIT_COMMIT_HASH@"
+#define FELZTRACE_VERSION @PROJECT_VERSION@
+
+namespace felztrace {
+    constexpr const char* COMMIT_HASH = FELZTRACE_COMMIT_HASH;
+    constexpr int VERSION = FELZTRACE_VERSION;
+}

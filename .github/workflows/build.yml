@@ -84,27 +84,77 @@ jobs:
 
       - name: check clang-format
         run: |
-          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "git config --global --add safe.directory /repository; scripts/check-clang-format.sh"
+          docker run --rm --user $(id -u):$(id -g) -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "scripts/check-clang-format.sh"
 
       - name: build application
         run: |
-          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" scripts/build.sh
+          docker run --rm --user $(id -u):$(id -g) -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "scripts/build.sh --release --no-tests"
+
+      - name: run tests
+        run: |
+          docker run --rm --user $(id -u):$(id -g) -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "ctest --test-dir build-release --output-on-failure"
 
       - name: run clang-tidy analysis
         run: |
-          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build --target clang-tidy"
+          docker run --rm --user $(id -u):$(id -g) -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build-release --target clang-tidy"
 
       - name: run clang static analysis
         run: |
-          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build --target static-analyze"
+          docker run --rm --user $(id -u):$(id -g) -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build-release --target static-analyze"
       
       - name: run cppcheck analysis
         run: |
-          docker run --rm -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build --target cppcheck"
+          docker run --rm --user $(id -u):$(id -g) -v "$PWD":/repository "$DEV_IMAGE_NAME" /bin/bash -c "cmake --build build-release --target cppcheck"
       
-      - name: build runtime container
+      - name: coverage analysis
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        run: |
+          docker run --rm --user $(id -u):$(id -g) -v "$PWD":/repository "$DEV_IMAGE_NAME" scripts/build.sh --coverage
+      
+      - name: upload coverage reports to artifacts
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            build-cov/*.html
+            build-cov/*.css
+
+      - name: upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: felztrace-binary
+          path: build-release/FelzTrace
+
+  build-and-push-runtime:
+    needs: build-app
+    if: success()
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: felztrace-binary
+          path: build-release
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build runtime container
         run: docker build --target runtime -t "$RUNTIME_IMAGE_NAME" -f docker/Dockerfile .
-          
-      - name: Push runtime image (only main branch)  
-        if: steps.changes.outputs.docker == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'  
+
+      - name: Push runtime image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: docker push "$RUNTIME_IMAGE_NAME"
