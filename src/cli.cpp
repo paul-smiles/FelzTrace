@@ -9,7 +9,7 @@ namespace felztrace
 namespace
 {
 
-void print_help()
+void printHelp()
 {
     spdlog::info("FelzTrace - A requirements tracing application\n");
     spdlog::info("Usage: FelzTrace [OPTIONS]\n");
@@ -20,7 +20,7 @@ void print_help()
     spdlog::info("  -q, --quiet      Suppress all output except errors");
 }
 
-void print_version()
+void printVersion()
 {
     spdlog::info("FelzTrace commit count: {}", VERSION);
     spdlog::info("FelzTrace commit hash: {}", COMMIT_HASH);
@@ -28,7 +28,7 @@ void print_version()
 
 } // anonymous namespace
 
-int parse_cli(int argc, const char* argv[])
+ReturnCode parseCli(int argc, const char* argv[])
 {
     // Set default log level to info
     spdlog::set_level(spdlog::level::info);
@@ -40,13 +40,13 @@ int parse_cli(int argc, const char* argv[])
 
         if (arg == "-h" || arg == "--help")
         {
-            print_help();
-            return 0;
+            printHelp();
+            return ReturnCode::Success;
         }
         if (arg == "-v" || arg == "--version")
         {
-            print_version();
-            return 0;
+            printVersion();
+            return ReturnCode::Success;
         }
         if (arg == "-d" || arg == "--debug")
         {
@@ -61,10 +61,10 @@ int parse_cli(int argc, const char* argv[])
         {
             spdlog::error("Unknown option: {}", arg);
             spdlog::error("Use -h or --help for usage information");
-            return 1;
+            return ReturnCode::Error;
         }
     }
-    return 0;
+    return ReturnCode::Success;
 }
 
 } // namespace felztrace

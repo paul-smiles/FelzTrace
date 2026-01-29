@@ -3,6 +3,12 @@
 namespace felztrace
 {
 
-int parse_cli(int argc, const char* argv[]);
+enum class ReturnCode
+{
+    Success = 0,
+    Error = 1
+};
 
-}
+ReturnCode parseCli(int argc, const char* argv[]);
+
+} // namespace felztrace
