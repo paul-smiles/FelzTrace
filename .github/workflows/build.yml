@@ -21,7 +21,7 @@ on:
       - '.github/workflows/build.yml'
 
 jobs:
-  docker-build-and-push:
+  docker-dev-build-and-push:
     runs-on: ubuntu-latest
 
     permissions:
@@ -60,7 +60,7 @@ jobs:
         run: docker push "$DEV_IMAGE_NAME"
 
   build-app:
-    needs: docker-build-and-push
+    needs: docker-dev-build-and-push
     runs-on: ubuntu-latest
 
     permissions:
@@ -126,7 +126,7 @@ jobs:
           name: felztrace-binary
           path: build-release/FelzTrace
 
-  build-and-push-runtime:
+  docker-runtime-build-and-push:
     needs: build-app
     if: success()
     runs-on: ubuntu-latest
