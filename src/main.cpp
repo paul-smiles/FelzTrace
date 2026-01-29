@@ -3,10 +3,10 @@
 
 int main(int argc, const char* argv[])
 {
-    int returnCode = felztrace::parse_cli(argc, argv);
-    if (returnCode == 0)
+    felztrace::ReturnCode returnCode = felztrace::parseCli(argc, argv);
+    if (returnCode == felztrace::ReturnCode::Success)
     {
         felztrace::run();
     }
-    return returnCode;
+    return static_cast<int>(returnCode);
 }
