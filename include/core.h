@@ -4,5 +4,4 @@ namespace felztrace
 {
 
 void run();
-
 }

@@ -96,6 +96,17 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(spdlog)
 
+# ---------------------------------------------------------
+# Fetch yaml-cpp
+# ---------------------------------------------------------
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG        0.8.0
+)
+
+FetchContent_MakeAvailable(yaml-cpp)
+
 # Configure version header
 configure_file(
   ${CMAKE_SOURCE_DIR}/include/version.h.in
@@ -156,6 +167,7 @@ add_custom_target(cppcheck
           --template=gcc
           --error-exitcode=2
           --suppress=*:*/_deps/*
+          -i${CMAKE_SOURCE_DIR}/tests
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   COMMENT "Running cppcheck (using compile_commands.json)"
 )
@@ -208,6 +220,8 @@ set(SOURCES
     src/main.cpp
     src/cli.cpp
     src/core.cpp
+    src/requirement_store_yml.cpp
+    src/real_filesystem.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -239,6 +253,7 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         spdlog::spdlog
+        yaml-cpp
 )
 
 add_subdirectory(tests)
