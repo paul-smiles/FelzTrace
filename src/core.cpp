@@ -1,5 +1,4 @@
 #include "core.h"
-#include "cli.h"
 #include <spdlog/spdlog.h>
 
 namespace felztrace

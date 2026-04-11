@@ -37,6 +37,6 @@ TEST(MainCoverage, ExecuteBinaryHelp)
 
 TEST(MainCoverage, ExecuteBinaryVersion)
 {
-    std::string output = exec("../FelzTrace -v 2>&1");
+    std::string output = exec("../FelzTrace --version 2>&1");
     EXPECT_NE(output.find("FelzTrace commit"), std::string::npos);
 }
