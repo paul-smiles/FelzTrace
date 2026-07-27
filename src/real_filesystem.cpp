@@ -1,6 +1,7 @@
 #include "filesystem_interface.h"
 #include <fstream>
 #include <spdlog/spdlog.h>
+#include <sstream>
 
 namespace felztrace
 {
@@ -29,6 +30,15 @@ bool RealFilesystem::is_regular_file(const std::filesystem::path& path) const
 void RealFilesystem::remove_all(const std::filesystem::path& path, std::error_code& errorCode) const
 {
     std::filesystem::remove_all(path, errorCode);
+}
+
+bool RealFilesystem::equivalent(const std::filesystem::path& path1,
+                                const std::filesystem::path& path2) const
+{
+    std::error_code ec;
+    bool result = std::filesystem::equivalent(path1, path2, ec);
+    // If ec is set, paths don't exist or can't be compared - return false
+    return !ec && result;
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -65,11 +75,13 @@ RealFilesystem::listFilesWithExtensionAndName(const std::filesystem::path& root,
 std::string RealFilesystem::readFile(const std::filesystem::path& path) const
 {
     std::ifstream file(path);
-    if (!file)
+    if (!file.is_open())
     {
         throw std::runtime_error("Failed to read file: " + path.string());
     }
-    return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::ostringstream ss;
+    ss << file.rdbuf();
+    return ss.str();
 }
 
 void RealFilesystem::writeFile(const std::filesystem::path& path, const std::string& content) const

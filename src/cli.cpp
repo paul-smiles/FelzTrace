@@ -33,8 +33,8 @@ void configureDefaultLogging()
 
 void enableVerboseLogging()
 {
-    spdlog::debug("Verbose mode enabled - showing debug logs");
     spdlog::set_level(spdlog::level::debug);
+    spdlog::debug("Verbose mode enabled - showing debug logs");
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
 }
 
@@ -49,9 +49,9 @@ bool isHelpOption(const std::string& arg) { return arg == "-h" || arg == "--help
 void printHelp()
 {
     spdlog::info(R"(FelzTrace - A requirements tracing application
-Usage: FelzTrace [OPTIONS] <COMMAND>
+Usage: FelzTrace [OPTIONS] [COMMAND]
 
-Positional arguments:
+Commands:
     create          Create a new requirement store with the specified name at the given path
     delete          Delete a requirement store by name
 
@@ -118,6 +118,26 @@ bool tryParseLevel(const std::string& levelArg, int& level)
     }
 }
 
+bool isValidOption(const std::string& arg)
+{
+    return arg == "-h" || arg == "--help" || arg == "-V" || arg == "--version" || arg == "-v" ||
+           arg == "--verbose" || arg == "-q" || arg == "--quiet";
+}
+
+bool validateTrailingArgs(int argc, const char* argv[], int startIndex)
+{
+    for (int i = startIndex; i < argc; ++i)
+    {
+        if (!isValidOption(argv[i]))
+        {
+            spdlog::error("Unknown option: {}", argv[i]);
+            spdlog::error("Use -h or --help for usage information");
+            return false;
+        }
+    }
+    return true;
+}
+
 CommandResult handleCreateCommand(int argc, const char* argv[], int index, RequirementStore& store)
 {
     if (nextArgIsHelp(argc, argv, index))
@@ -145,6 +165,12 @@ CommandResult handleCreateCommand(int argc, const char* argv[], int index, Requi
         return stopParsing(ReturnCode::Error);
     }
 
+    // Validate trailing arguments before executing the operation
+    if (!validateTrailingArgs(argc, argv, index + 4))
+    {
+        return stopParsing(ReturnCode::Error);
+    }
+
     try
     {
         store.createRequirementStore(name, path, level);
@@ -160,7 +186,14 @@ CommandResult handleCreateCommand(int argc, const char* argv[], int index, Requi
 
 bool deleteConfirmed(const std::string& name, std::istream& input)
 {
+    // Temporarily restore log level for interactive prompt (bypasses quiet mode)
+    auto savedLevel = spdlog::get_level();
+    spdlog::set_level(spdlog::level::info);
+
     spdlog::info("Are you sure you want to delete requirement store '{}'? [y/N]: ", name);
+
+    // Restore previous log level
+    spdlog::set_level(savedLevel);
 
     std::string confirmation;
     std::getline(input, confirmation);
@@ -184,6 +217,13 @@ CommandResult handleDeleteCommand(int argc, const char* argv[], int index, Requi
     }
 
     const std::string name = argv[index + 1];
+
+    // Validate trailing arguments before prompting user
+    if (!validateTrailingArgs(argc, argv, index + 2))
+    {
+        return stopParsing(ReturnCode::Error);
+    }
+
     if (!deleteConfirmed(name, input))
     {
         spdlog::info("Delete cancelled.");

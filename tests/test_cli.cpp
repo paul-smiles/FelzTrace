@@ -75,6 +75,14 @@ TEST_F(CLITest, VersionOption)
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
 }
 
+TEST_F(CLITest, VersionShortOption)
+{
+    const char* argv[] = {"FelzTrace", "-V"};
+    felztrace::ReturnCode result = felztrace::parseCli(2, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Success);
+}
+
 TEST_F(CLITest, VerboseOption)
 {
     const char* argv[] = {"FelzTrace", "-v"};
@@ -285,4 +293,78 @@ TEST_F(CLITest, DeleteSuccessWithUppercaseY)
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
     EXPECT_TRUE(store.deleteCalled);
     EXPECT_EQ(store.lastDeleteName, "mystore");
+}
+
+TEST_F(CLITest, CreateWithInvalidTrailingOption)
+{
+    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "1", "--typo"};
+    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Error);
+    EXPECT_FALSE(store.createCalled);
+}
+
+TEST_F(CLITest, CreateWithValidTrailingVerbose)
+{
+    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "1", "--verbose"};
+    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Success);
+    EXPECT_TRUE(store.createCalled);
+    EXPECT_EQ(spdlog::get_level(), spdlog::level::debug);
+}
+
+TEST_F(CLITest, CreateWithValidTrailingQuiet)
+{
+    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "2", "--quiet"};
+    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Success);
+    EXPECT_TRUE(store.createCalled);
+    EXPECT_EQ(spdlog::get_level(), spdlog::level::err);
+}
+
+TEST_F(CLITest, CreateWithMultipleInvalidTrailingOptions)
+{
+    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path",
+                          "1",         "-v",     "--invalid"};
+    felztrace::ReturnCode result = felztrace::parseCli(7, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Error);
+    EXPECT_FALSE(store.createCalled);
+}
+
+TEST_F(CLITest, DeleteWithInvalidTrailingOption)
+{
+    std::istringstream in("y");
+    const char* argv[] = {"FelzTrace", "delete", "mystore", "--typo"};
+    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store, in);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Error);
+    EXPECT_FALSE(store.deleteCalled);
+}
+
+TEST_F(CLITest, DeleteWithValidTrailingOption)
+{
+    std::istringstream in("y");
+    const char* argv[] = {"FelzTrace", "delete", "mystore", "-v"};
+    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store, in);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Success);
+    EXPECT_TRUE(store.deleteCalled);
+    EXPECT_EQ(spdlog::get_level(), spdlog::level::debug);
+}
+
+TEST_F(CLITest, DeleteWithInvalidOptionDoesNotPrompt)
+{
+    std::istringstream in("y");
+    const char* argv[] = {"FelzTrace", "delete", "mystore", "--unknown"};
+    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store, in);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Error);
+    EXPECT_FALSE(store.deleteCalled);
+    // Input stream should not be consumed since we reject before prompting
+    std::string remaining;
+    std::getline(in, remaining);
+    EXPECT_EQ(remaining, "y");
 }

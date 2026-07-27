@@ -83,6 +83,25 @@ void RequirementStoreYml::createStore(const StoreSettings& storeSettings)
 
     spdlog::debug("Check for store at specified path and create directory if needed.");
 
+    std::filesystem::path storePath = m_filesystem->weakly_canonical(storeSettings.path);
+
+    // Guard against creating stores at git root
+    if (m_filesystem->equivalent(storePath, gitRoot))
+    {
+        throw std::runtime_error("Cannot create requirement store at git root '" +
+                                 storePath.string() +
+                                 "'. Requirement stores must be in a subdirectory to prevent "
+                                 "accidental deletion of the repository.");
+    }
+
+    // Guard against creating stores in directories containing .git
+    if (m_filesystem->exists(storePath / ".git"))
+    {
+        throw std::runtime_error(
+            "Cannot create requirement store at '" + storePath.string() +
+            "': directory contains .git repository. Requirement stores must be in a subdirectory.");
+    }
+
     std::filesystem::path yamlFilePath =
         m_filesystem->weakly_canonical(std::filesystem::path(storeSettings.path) / configFilename);
     if (m_filesystem->exists(yamlFilePath))
@@ -132,8 +151,28 @@ void RequirementStoreYml::deleteRequirementStore(const std::string& name)
         {
             spdlog::debug("Matching requirement store found at '{}', deleting store",
                           yamlPath.string());
+
+            std::filesystem::path storeDir = yamlPath.parent_path();
+
+            // Guard against deleting git root or any directory containing .git
+            if (m_filesystem->exists(storeDir / ".git"))
+            {
+                throw std::runtime_error("Cannot delete requirement store at '" +
+                                         storeDir.string() +
+                                         "': directory contains .git repository. Requirement "
+                                         "stores must be in a subdirectory.");
+            }
+
+            // Additional safety: check if store directory is the git root
+            if (m_filesystem->equivalent(storeDir, gitRoot))
+            {
+                throw std::runtime_error("Cannot delete requirement store at git root '" +
+                                         storeDir.string() +
+                                         "'. Requirement stores must be in a subdirectory.");
+            }
+
             std::error_code errorCode;
-            m_filesystem->remove_all(yamlPath.parent_path(), errorCode);
+            m_filesystem->remove_all(storeDir, errorCode);
             if (errorCode)
             {
                 throw std::filesystem::filesystem_error(
