@@ -3,6 +3,7 @@ add_executable(unit_tests
   test_cli.cpp
   test_core.cpp
   test_requirement_store_yml.cpp
+  test_integration_requirement_store_yml.cpp
   test_real_filesystem.cpp
   ${CMAKE_SOURCE_DIR}/src/cli.cpp
   ${CMAKE_SOURCE_DIR}/src/core.cpp

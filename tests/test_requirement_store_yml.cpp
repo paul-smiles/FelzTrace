@@ -24,6 +24,8 @@ class MockFilesystem : public IFilesystem
     MOCK_METHOD(bool, is_regular_file, (const std::filesystem::path&), (const, override));
     MOCK_METHOD(void, remove_all, (const std::filesystem::path&, std::error_code&),
                 (const, override));
+    MOCK_METHOD(bool, equivalent, (const std::filesystem::path&, const std::filesystem::path&),
+                (const, override));
     MOCK_METHOD(std::vector<std::filesystem::path>, listFilesWithExtensionAndName,
                 (const std::filesystem::path&, const FileExtension&, const FileName&),
                 (const, override));
@@ -61,6 +63,9 @@ TEST_F(RequirementStoreTest, CallsCreateDirectories)
                                                           FileName(".felztrace.yml")))
         .WillOnce(Return(std::vector<std::filesystem::path>{}));
 
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
     EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
         .WillOnce(Return(storePath / CONFIG_FILENAME));
     EXPECT_CALL(*mockFsPtr, exists(storePath / CONFIG_FILENAME)).WillOnce(Return(false));
@@ -83,6 +88,9 @@ TEST_F(RequirementStoreTest, ThrowsWhenCreateDirectoriesFails)
     EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(_, _, _))
         .WillOnce(Return(std::vector<std::filesystem::path>{}));
 
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
     EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
         .WillOnce(Return(storePath / CONFIG_FILENAME));
     EXPECT_CALL(*mockFsPtr, exists(storePath / CONFIG_FILENAME)).WillOnce(Return(false));
@@ -106,6 +114,9 @@ TEST_F(RequirementStoreTest, WritesYamlFileWithCorrectSettings)
     EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(_, _, _))
         .WillOnce(Return(std::vector<std::filesystem::path>{}));
 
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
     EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
         .WillOnce(Return(storePath / CONFIG_FILENAME));
     EXPECT_CALL(*mockFsPtr, exists(storePath / CONFIG_FILENAME)).WillOnce(Return(false));
@@ -134,6 +145,11 @@ TEST_F(RequirementStoreTest, ThrowsWhenYamlFileAlreadyExists)
     EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(_, _, _))
         .WillOnce(Return(std::vector<std::filesystem::path>{}));
 
+    // Git root checks happen before YAML file existence check
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
+
     // YAML file already exists - should throw before create_directories
     EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
         .WillOnce(Return(storePath / CONFIG_FILENAME));
@@ -157,6 +173,9 @@ TEST_F(RequirementStoreTest, SearchesForGitRootUpwards)
                                                           FileName(".felztrace.yml")))
         .WillOnce(Return(std::vector<std::filesystem::path>{}));
 
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
     EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
         .WillOnce(Return(storePath / CONFIG_FILENAME));
     EXPECT_CALL(*mockFsPtr, exists(storePath / CONFIG_FILENAME)).WillOnce(Return(false));
@@ -195,6 +214,9 @@ TEST_F(RequirementStoreTest, SearchesForDuplicatePrefixesInGitRoot)
         .WillOnce(
             DoAll(SaveArg<0>(&capturedSearchPath), Return(std::vector<std::filesystem::path>{})));
 
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
     EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
         .WillOnce(Return(storePath / CONFIG_FILENAME));
     EXPECT_CALL(*mockFsPtr, exists(storePath / CONFIG_FILENAME)).WillOnce(Return(false));
@@ -246,6 +268,9 @@ TEST_F(RequirementStoreTest, AllowsCreationWhenDifferentPrefixFound)
     std::string existingYaml = "store: differentstore\n";
     EXPECT_CALL(*mockFsPtr, readFile(existingStore)).WillOnce(Return(existingYaml));
 
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
     EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
         .WillOnce(Return(storePath / CONFIG_FILENAME));
     EXPECT_CALL(*mockFsPtr, exists(storePath / CONFIG_FILENAME)).WillOnce(Return(false));
@@ -353,4 +378,77 @@ TEST_F(RequirementStoreTest, ThrowsWhenRemoveAllFails)
 
     RequirementStoreYml store(std::move(mockFs));
     EXPECT_THROW(store.deleteRequirementStore("mystore"), std::filesystem::filesystem_error);
+}
+
+TEST_F(RequirementStoreTest, ThrowsWhenCreatingStoreAtGitRoot)
+{
+    std::filesystem::path gitRoot = "/project";
+    std::filesystem::path storePath = "/project";
+
+    EXPECT_CALL(*mockFsPtr, findGitRoot(storePath)).WillOnce(Return(gitRoot));
+    EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(gitRoot, FileExtension(".yml"),
+                                                          FileName(".felztrace.yml")))
+        .WillOnce(Return(std::vector<std::filesystem::path>{}));
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(true));
+
+    RequirementStoreYml store(std::move(mockFs));
+    EXPECT_THROW(store.createRequirementStore("mystore", storePath.string(), 1),
+                 std::runtime_error);
+}
+
+TEST_F(RequirementStoreTest, ThrowsWhenCreatingStoreInDirectoryWithGit)
+{
+    std::filesystem::path gitRoot = "/project";
+    std::filesystem::path storePath = "/project/subdir";
+
+    EXPECT_CALL(*mockFsPtr, findGitRoot(storePath)).WillOnce(Return(gitRoot));
+    EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(gitRoot, FileExtension(".yml"),
+                                                          FileName(".felztrace.yml")))
+        .WillOnce(Return(std::vector<std::filesystem::path>{}));
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(true));
+
+    RequirementStoreYml store(std::move(mockFs));
+    EXPECT_THROW(store.createRequirementStore("mystore", storePath.string(), 1),
+                 std::runtime_error);
+}
+
+TEST_F(RequirementStoreTest, ThrowsWhenDeletingStoreAtGitRoot)
+{
+    std::filesystem::path gitRoot = "/project";
+    std::filesystem::path yamlFilePath = "/project/.felztrace.yml";
+
+    EXPECT_CALL(*mockFsPtr, findGitRoot(std::filesystem::current_path())).WillOnce(Return(gitRoot));
+    EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(gitRoot, FileExtension(".yml"),
+                                                          FileName(".felztrace.yml")))
+        .WillOnce(Return(std::vector<std::filesystem::path>{yamlFilePath}));
+
+    std::string yamlContent = "store: mystore\n";
+    EXPECT_CALL(*mockFsPtr, readFile(yamlFilePath)).WillOnce(Return(yamlContent));
+    EXPECT_CALL(*mockFsPtr, exists(gitRoot / ".git")).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, equivalent(gitRoot, gitRoot)).WillOnce(Return(true));
+
+    RequirementStoreYml store(std::move(mockFs));
+    EXPECT_THROW(store.deleteRequirementStore("mystore"), std::runtime_error);
+}
+
+TEST_F(RequirementStoreTest, ThrowsWhenDeletingStoreInDirectoryWithGit)
+{
+    std::filesystem::path gitRoot = "/project";
+    std::filesystem::path storePath = "/project/subdir";
+    std::filesystem::path yamlFilePath = storePath / ".felztrace.yml";
+
+    EXPECT_CALL(*mockFsPtr, findGitRoot(std::filesystem::current_path())).WillOnce(Return(gitRoot));
+    EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(gitRoot, FileExtension(".yml"),
+                                                          FileName(".felztrace.yml")))
+        .WillOnce(Return(std::vector<std::filesystem::path>{yamlFilePath}));
+
+    std::string yamlContent = "store: mystore\n";
+    EXPECT_CALL(*mockFsPtr, readFile(yamlFilePath)).WillOnce(Return(yamlContent));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(true));
+
+    RequirementStoreYml store(std::move(mockFs));
+    EXPECT_THROW(store.deleteRequirementStore("mystore"), std::runtime_error);
 }

@@ -47,6 +47,8 @@ class IFilesystem
     virtual bool is_regular_file(const std::filesystem::path& path) const = 0;
     virtual void remove_all(const std::filesystem::path& path,
                             std::error_code& errorCode) const = 0;
+    virtual bool equivalent(const std::filesystem::path& path1,
+                            const std::filesystem::path& path2) const = 0;
 
     // For directory iteration
     virtual std::vector<std::filesystem::path>
@@ -71,6 +73,8 @@ class RealFilesystem : public IFilesystem
                             std::error_code& errorCode) const override;
     bool is_regular_file(const std::filesystem::path& path) const override;
     void remove_all(const std::filesystem::path& path, std::error_code& errorCode) const override;
+    bool equivalent(const std::filesystem::path& path1,
+                    const std::filesystem::path& path2) const override;
     std::vector<std::filesystem::path>
     listFilesWithExtensionAndName(const std::filesystem::path& root, const FileExtension& extension,
                                   const FileName& filename = FileName()) const override;
