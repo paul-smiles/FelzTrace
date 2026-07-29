@@ -52,8 +52,9 @@ void printHelp()
 Usage: FelzTrace [OPTIONS] [COMMAND]
 
 Commands:
-    create          Create a new requirement store with the specified name at the given path
-    delete          Delete a requirement store by name
+    reqs init       Create a new requirement store with the specified name at the given path
+    tests init      Create a new test store with the specified name at the given path
+    delete          Delete a store by name
 
 Options:
     -h, --help      Show this help message
@@ -63,11 +64,11 @@ Options:
 )");
 }
 
-void printCreateHelp()
+void printReqsHelp()
 {
-    spdlog::info(R"(FelzTrace create - Create a requirement store
+    spdlog::info(R"(FelzTrace reqs init - Create a requirement store
 Usage:
-    FelzTrace [GLOBAL_OPTIONS] create [OPTIONS] <name> <path> <level>
+    FelzTrace [GLOBAL_OPTIONS] reqs init [OPTIONS] <name> <path> <level>
 
 Options:
     -h, --help  Show this help message
@@ -80,9 +81,24 @@ Global Options:
 
 void printDeleteHelp()
 {
-    spdlog::info(R"(FelzTrace delete - Delete a requirement store
+    spdlog::info(R"(FelzTrace delete - Delete a store
 Usage:
     FelzTrace [GLOBAL_OPTIONS] delete [OPTIONS] <name>
+
+Options:
+    -h, --help  Show this help message
+Global Options:
+    -V, --version   Show version information
+    -v, --verbose   Enable verbose logging
+    -q, --quiet     Suppress all output except errors
+)");
+}
+
+void printTestsHelp()
+{
+    spdlog::info(R"(FelzTrace tests init - Create a test store
+Usage:
+    FelzTrace [GLOBAL_OPTIONS] tests init [OPTIONS] <name> <path> <level>
 
 Options:
     -h, --help  Show this help message
@@ -138,35 +154,54 @@ bool validateTrailingArgs(int argc, const char* argv[], int startIndex)
     return true;
 }
 
-CommandResult handleCreateCommand(int argc, const char* argv[], int index, RequirementStore& store)
+bool commandArgIsHelp(int argc, const char* argv[], int index)
 {
-    if (nextArgIsHelp(argc, argv, index))
+    return index < argc && isHelpOption(argv[index]);
+}
+
+CommandResult handleReqsInitCommand(int argc, const char* argv[], int index,
+                                    RequirementStore& store)
+{
+    if (commandArgIsHelp(argc, argv, index + 1))
     {
-        printCreateHelp();
+        printReqsHelp();
         return stopParsing(ReturnCode::Success);
     }
 
-    if (index + 3 >= argc)
+    if (index + 1 >= argc || std::string(argv[index + 1]) != "init")
     {
-        spdlog::error("Missing required arguments for create");
-        printCreateHelp();
+        spdlog::error("Missing required subcommand 'init' for reqs");
+        printReqsHelp();
         return stopParsing(ReturnCode::Error);
     }
 
-    const std::string name = argv[index + 1];
-    const std::string path = argv[index + 2];
-    const std::string levelArg = argv[index + 3];
+    if (commandArgIsHelp(argc, argv, index + 2))
+    {
+        printReqsHelp();
+        return stopParsing(ReturnCode::Success);
+    }
+
+    if (index + 4 >= argc)
+    {
+        spdlog::error("Missing required arguments for reqs init");
+        printReqsHelp();
+        return stopParsing(ReturnCode::Error);
+    }
+
+    const std::string name = argv[index + 2];
+    const std::string path = argv[index + 3];
+    const std::string levelArg = argv[index + 4];
     int level = 0;
 
     if (!tryParseLevel(levelArg, level))
     {
         spdlog::error("Invalid level '{}'. Level must be an integer.", levelArg);
-        printCreateHelp();
+        printReqsHelp();
         return stopParsing(ReturnCode::Error);
     }
 
     // Validate trailing arguments before executing the operation
-    if (!validateTrailingArgs(argc, argv, index + 4))
+    if (!validateTrailingArgs(argc, argv, index + 5))
     {
         return stopParsing(ReturnCode::Error);
     }
@@ -181,7 +216,66 @@ CommandResult handleCreateCommand(int argc, const char* argv[], int index, Requi
         return stopParsing(ReturnCode::Error);
     }
 
-    return continueParsing(3);
+    return continueParsing(4);
+}
+
+CommandResult handleTestsInitCommand(int argc, const char* argv[], int index,
+                                     RequirementStore& store)
+{
+    if (commandArgIsHelp(argc, argv, index + 1))
+    {
+        printTestsHelp();
+        return stopParsing(ReturnCode::Success);
+    }
+
+    if (index + 1 >= argc || std::string(argv[index + 1]) != "init")
+    {
+        spdlog::error("Missing required subcommand 'init' for tests");
+        printTestsHelp();
+        return stopParsing(ReturnCode::Error);
+    }
+
+    if (commandArgIsHelp(argc, argv, index + 2))
+    {
+        printTestsHelp();
+        return stopParsing(ReturnCode::Success);
+    }
+
+    if (index + 4 >= argc)
+    {
+        spdlog::error("Missing required arguments for tests init");
+        printTestsHelp();
+        return stopParsing(ReturnCode::Error);
+    }
+
+    const std::string name = argv[index + 2];
+    const std::string path = argv[index + 3];
+    const std::string levelArg = argv[index + 4];
+    int level = 0;
+
+    if (!tryParseLevel(levelArg, level))
+    {
+        spdlog::error("Invalid level '{}'. Level must be an integer.", levelArg);
+        printTestsHelp();
+        return stopParsing(ReturnCode::Error);
+    }
+
+    if (!validateTrailingArgs(argc, argv, index + 5))
+    {
+        return stopParsing(ReturnCode::Error);
+    }
+
+    try
+    {
+        store.createTestStore(name, path, level);
+    }
+    catch (const std::exception& ex)
+    {
+        spdlog::error("Failed to create test store: {}", ex.what());
+        return stopParsing(ReturnCode::Error);
+    }
+
+    return continueParsing(4);
 }
 
 bool deleteConfirmed(const std::string& name, std::istream& input)
@@ -190,7 +284,7 @@ bool deleteConfirmed(const std::string& name, std::istream& input)
     auto savedLevel = spdlog::get_level();
     spdlog::set_level(spdlog::level::info);
 
-    spdlog::info("Are you sure you want to delete requirement store '{}'? [y/N]: ", name);
+    spdlog::info("Are you sure you want to delete store '{}'? [y/N]: ", name);
 
     // Restore previous log level
     spdlog::set_level(savedLevel);
@@ -232,11 +326,11 @@ CommandResult handleDeleteCommand(int argc, const char* argv[], int index, Requi
 
     try
     {
-        store.deleteRequirementStore(name);
+        store.deleteStore(name);
     }
     catch (const std::exception& ex)
     {
-        spdlog::error("Failed to delete requirement store: {}", ex.what());
+        spdlog::error("Failed to delete store: {}", ex.what());
         return stopParsing(ReturnCode::Error);
     }
 
@@ -263,9 +357,19 @@ ReturnCode parseCli(int argc, const char* argv[], RequirementStore& store, std::
             printVersion();
             return ReturnCode::Success;
         }
-        if (arg == "create")
+        if (arg == "reqs")
         {
-            const CommandResult result = handleCreateCommand(argc, argv, i, store);
+            const CommandResult result = handleReqsInitCommand(argc, argv, i, store);
+            if (result.shouldReturn)
+            {
+                return result.code;
+            }
+            i += result.consumedArgs;
+            continue;
+        }
+        if (arg == "tests")
+        {
+            const CommandResult result = handleTestsInitCommand(argc, argv, i, store);
             if (result.shouldReturn)
             {
                 return result.code;
