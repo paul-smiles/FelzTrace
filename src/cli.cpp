@@ -154,37 +154,57 @@ bool validateTrailingArgs(int argc, const char* argv[], int startIndex)
     return true;
 }
 
+void applyTrailingLoggingOptions(int argc, const char* argv[], int startIndex)
+{
+    for (int i = startIndex; i < argc; ++i)
+    {
+        const std::string option = argv[i];
+        if (option == "-v" || option == "--verbose")
+        {
+            enableVerboseLogging();
+        }
+        else if (option == "-q" || option == "--quiet")
+        {
+            enableQuietLogging();
+        }
+    }
+}
+
 bool commandArgIsHelp(int argc, const char* argv[], int index)
 {
     return index < argc && isHelpOption(argv[index]);
 }
 
-CommandResult handleReqsInitCommand(int argc, const char* argv[], int index,
-                                    RequirementStore& store)
+using CreateStoreAction = void (RequirementStore::*)(const std::string&, const std::string&, int);
+
+CommandResult handleInitCommand(int argc, const char* argv[], int index, const std::string& command,
+                                void (*printCommandHelp)(), RequirementStore& store,
+                                CreateStoreAction createStoreAction,
+                                const std::string& createStoreErrorLabel)
 {
     if (commandArgIsHelp(argc, argv, index + 1))
     {
-        printReqsHelp();
+        printCommandHelp();
         return stopParsing(ReturnCode::Success);
     }
 
     if (index + 1 >= argc || std::string(argv[index + 1]) != "init")
     {
-        spdlog::error("Missing required subcommand 'init' for reqs");
-        printReqsHelp();
+        spdlog::error("Missing required subcommand 'init' for {}", command);
+        printCommandHelp();
         return stopParsing(ReturnCode::Error);
     }
 
     if (commandArgIsHelp(argc, argv, index + 2))
     {
-        printReqsHelp();
+        printCommandHelp();
         return stopParsing(ReturnCode::Success);
     }
 
     if (index + 4 >= argc)
     {
-        spdlog::error("Missing required arguments for reqs init");
-        printReqsHelp();
+        spdlog::error("Missing required arguments for {} init", command);
+        printCommandHelp();
         return stopParsing(ReturnCode::Error);
     }
 
@@ -196,86 +216,42 @@ CommandResult handleReqsInitCommand(int argc, const char* argv[], int index,
     if (!tryParseLevel(levelArg, level))
     {
         spdlog::error("Invalid level '{}'. Level must be an integer.", levelArg);
-        printReqsHelp();
+        printCommandHelp();
         return stopParsing(ReturnCode::Error);
     }
 
-    // Validate trailing arguments before executing the operation
     if (!validateTrailingArgs(argc, argv, index + 5))
     {
         return stopParsing(ReturnCode::Error);
     }
 
+    applyTrailingLoggingOptions(argc, argv, index + 5);
+
     try
     {
-        store.createRequirementStore(name, path, level);
+        (store.*createStoreAction)(name, path, level);
     }
     catch (const std::exception& ex)
     {
-        spdlog::error("Failed to create requirement store: {}", ex.what());
+        spdlog::error("Failed to create {} store: {}", createStoreErrorLabel, ex.what());
         return stopParsing(ReturnCode::Error);
     }
 
     return continueParsing(4);
 }
 
+CommandResult handleReqsInitCommand(int argc, const char* argv[], int index,
+                                    RequirementStore& store)
+{
+    return handleInitCommand(argc, argv, index, "reqs", printReqsHelp, store,
+                             &RequirementStore::createRequirementStore, "requirement");
+}
+
 CommandResult handleTestsInitCommand(int argc, const char* argv[], int index,
                                      RequirementStore& store)
 {
-    if (commandArgIsHelp(argc, argv, index + 1))
-    {
-        printTestsHelp();
-        return stopParsing(ReturnCode::Success);
-    }
-
-    if (index + 1 >= argc || std::string(argv[index + 1]) != "init")
-    {
-        spdlog::error("Missing required subcommand 'init' for tests");
-        printTestsHelp();
-        return stopParsing(ReturnCode::Error);
-    }
-
-    if (commandArgIsHelp(argc, argv, index + 2))
-    {
-        printTestsHelp();
-        return stopParsing(ReturnCode::Success);
-    }
-
-    if (index + 4 >= argc)
-    {
-        spdlog::error("Missing required arguments for tests init");
-        printTestsHelp();
-        return stopParsing(ReturnCode::Error);
-    }
-
-    const std::string name = argv[index + 2];
-    const std::string path = argv[index + 3];
-    const std::string levelArg = argv[index + 4];
-    int level = 0;
-
-    if (!tryParseLevel(levelArg, level))
-    {
-        spdlog::error("Invalid level '{}'. Level must be an integer.", levelArg);
-        printTestsHelp();
-        return stopParsing(ReturnCode::Error);
-    }
-
-    if (!validateTrailingArgs(argc, argv, index + 5))
-    {
-        return stopParsing(ReturnCode::Error);
-    }
-
-    try
-    {
-        store.createTestStore(name, path, level);
-    }
-    catch (const std::exception& ex)
-    {
-        spdlog::error("Failed to create test store: {}", ex.what());
-        return stopParsing(ReturnCode::Error);
-    }
-
-    return continueParsing(4);
+    return handleInitCommand(argc, argv, index, "tests", printTestsHelp, store,
+                             &RequirementStore::createTestStore, "test");
 }
 
 bool deleteConfirmed(const std::string& name, std::istream& input)

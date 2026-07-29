@@ -1,6 +1,5 @@
 #include "requirement_store_yml.h"
 #include <filesystem>
-#include <fstream>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string_view>
@@ -13,20 +12,6 @@ namespace felztrace
 namespace
 {
 constexpr std::string_view configFilename = ".felztrace.yml";
-
-std::string_view storeTypeToString(StoreType storeType)
-{
-    switch (storeType)
-    {
-    case StoreType::Requirements:
-        return "reqs";
-    case StoreType::Tests:
-        return "tests";
-    default:
-        spdlog::error("Unsupported store type value in storeTypeToString");
-        throw std::invalid_argument("Unsupported store type");
-    }
-}
 // void generateRequirement(const std::string& storeName, const std::filesystem::path& storePath,
 //                          IFilesystem* filesystem)
 // {
@@ -62,6 +47,20 @@ std::string_view storeTypeToString(StoreType storeType)
 RequirementStoreYml::RequirementStoreYml(std::unique_ptr<IFilesystem> filesystem)
     : m_filesystem(filesystem ? std::move(filesystem) : std::make_unique<RealFilesystem>())
 {
+}
+
+std::string_view RequirementStoreYml::storeTypeToString(StoreType storeType)
+{
+    switch (storeType)
+    {
+    case StoreType::Requirements:
+        return "reqs";
+    case StoreType::Tests:
+        return "tests";
+    default:
+        spdlog::error("Unsupported store type value in storeTypeToString");
+        throw std::invalid_argument("Unsupported store type");
+    }
 }
 
 void RequirementStoreYml::createRequirementStore(const std::string& name, const std::string& path,
@@ -199,7 +198,7 @@ void RequirementStoreYml::deleteStore(const std::string& name)
             m_filesystem->remove_all(storeDir, errorCode);
             if (errorCode)
             {
-                throw std::filesystem::filesystem_error("Error deleting store YAML file", yamlPath,
+                throw std::filesystem::filesystem_error("Error deleting store directory", storeDir,
                                                         errorCode);
             }
             spdlog::info("Store '{}' deleted successfully", name);

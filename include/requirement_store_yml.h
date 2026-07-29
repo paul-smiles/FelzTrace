@@ -5,20 +5,23 @@
 #include "requirement_store_config.h"
 #include <memory>
 #include <string>
+#include <string_view>
 #include <yaml-cpp/yaml.h>
 
 namespace felztrace
 {
 
-enum class StoreType
-{
-    Requirements,
-    Tests
-};
-
 class RequirementStoreYml : public RequirementStore
 {
   private:
+    enum class StoreType
+    {
+        Requirements,
+        Tests
+    };
+
+    static std::string_view storeTypeToString(StoreType storeType);
+
     struct StoreSettings
     {
         std::string storeName;
