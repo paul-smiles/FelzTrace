@@ -71,6 +71,21 @@ TEST_F(RequirementStoreYmlIntegrationTest, CreateRequirementStoreWritesCorrectSe
     EXPECT_EQ(root["settings"]["level"].as<int>(), 2);
 }
 
+TEST_F(RequirementStoreYmlIntegrationTest, CreateTestStoreWritesCorrectSettings)
+{
+    RequirementStoreYml store;
+
+    std::string storePath = (gitRoot / "my_test_store").string();
+    store.createTestStore("my_test_store", storePath, 3);
+
+    std::filesystem::path yamlFile = std::filesystem::path(storePath) / CONFIG_FILENAME;
+    YAML::Node root = YAML::LoadFile(yamlFile.string());
+
+    EXPECT_EQ(root["store"].as<std::string>(), "my_test_store");
+    EXPECT_EQ(root["settings"]["type"].as<std::string>(), "tests");
+    EXPECT_EQ(root["settings"]["level"].as<int>(), 3);
+}
+
 TEST_F(RequirementStoreYmlIntegrationTest, CreateRequirementStoreCreatesNestedDirectories)
 {
     RequirementStoreYml store;
@@ -174,7 +189,7 @@ TEST_F(RequirementStoreYmlIntegrationTest, DeleteRequirementStoreRemovesDirector
 
     // Change to git root for delete operation
     std::filesystem::current_path(gitRoot);
-    store.deleteRequirementStore("delete_test");
+    store.deleteStore("delete_test");
 
     EXPECT_FALSE(std::filesystem::exists(storePath));
 }
@@ -190,7 +205,7 @@ TEST_F(RequirementStoreYmlIntegrationTest, DeleteRequirementStoreRemovesYamlFile
     EXPECT_TRUE(std::filesystem::exists(yamlFile));
 
     std::filesystem::current_path(gitRoot);
-    store.deleteRequirementStore("delete_yaml");
+    store.deleteStore("delete_yaml");
 
     EXPECT_FALSE(std::filesystem::exists(yamlFile));
 }
@@ -210,7 +225,7 @@ TEST_F(RequirementStoreYmlIntegrationTest, DeleteRequirementStoreRemovesAllConte
     EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(storePath) / "extra_file.txt"));
 
     std::filesystem::current_path(gitRoot);
-    store.deleteRequirementStore("delete_all");
+    store.deleteStore("delete_all");
 
     EXPECT_FALSE(std::filesystem::exists(storePath));
 }
@@ -231,7 +246,7 @@ TEST_F(RequirementStoreYmlIntegrationTest, DeleteRequirementStoreThrowsAtGitRoot
     std::filesystem::current_path(gitRoot);
 
     // Attempt to delete - should throw
-    EXPECT_THROW(store.deleteRequirementStore("rootstore"), std::runtime_error);
+    EXPECT_THROW(store.deleteStore("rootstore"), std::runtime_error);
 }
 
 TEST_F(RequirementStoreYmlIntegrationTest, DeleteRequirementStoreThrowsInDirectoryWithGit)
@@ -256,7 +271,7 @@ TEST_F(RequirementStoreYmlIntegrationTest, DeleteRequirementStoreThrowsInDirecto
     std::filesystem::current_path(gitRoot);
 
     // Attempt to delete - should throw
-    EXPECT_THROW(store.deleteRequirementStore("badstore"), std::runtime_error);
+    EXPECT_THROW(store.deleteStore("badstore"), std::runtime_error);
 }
 
 TEST_F(RequirementStoreYmlIntegrationTest, DeleteNonexistentStoreDoesNotThrow)
@@ -266,5 +281,20 @@ TEST_F(RequirementStoreYmlIntegrationTest, DeleteNonexistentStoreDoesNotThrow)
     std::filesystem::current_path(gitRoot);
 
     // Attempting to delete non-existent store should not throw
-    EXPECT_NO_THROW(store.deleteRequirementStore("nonexistent"));
+    EXPECT_NO_THROW(store.deleteStore("nonexistent"));
+}
+
+TEST_F(RequirementStoreYmlIntegrationTest, DeleteStoreRemovesTestStoreDirectory)
+{
+    RequirementStoreYml store;
+
+    std::string storePath = (gitRoot / "delete_test_store_kind").string();
+    store.createTestStore("delete_test_store_kind", storePath, 2);
+
+    EXPECT_TRUE(std::filesystem::exists(storePath));
+
+    std::filesystem::current_path(gitRoot);
+    store.deleteStore("delete_test_store_kind");
+
+    EXPECT_FALSE(std::filesystem::exists(storePath));
 }

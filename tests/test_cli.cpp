@@ -11,10 +11,14 @@ class CLITest : public ::testing::Test
     {
       public:
         bool createCalled = false;
+        bool createTestCalled = false;
         bool deleteCalled = false;
         std::string lastName;
         std::string lastPath;
         int lastLevel = -1;
+        std::string lastTestName;
+        std::string lastTestPath;
+        int lastTestLevel = -1;
         std::string lastDeleteName;
 
         void createRequirementStore(const std::string& name, const std::string& path,
@@ -25,7 +29,14 @@ class CLITest : public ::testing::Test
             lastPath = path;
             lastLevel = level;
         }
-        void deleteRequirementStore(const std::string& name) override
+        void createTestStore(const std::string& name, const std::string& path, int level) override
+        {
+            createTestCalled = true;
+            lastTestName = name;
+            lastTestPath = path;
+            lastTestLevel = level;
+        }
+        void deleteStore(const std::string& name) override
         {
             deleteCalled = true;
             lastDeleteName = name;
@@ -138,24 +149,24 @@ TEST_F(CLITest, QuietLongOption)
 
 TEST_F(CLITest, CreateHelpLongOption)
 {
-    const char* argv[] = {"FelzTrace", "create", "--help"};
-    felztrace::ReturnCode result = felztrace::parseCli(3, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "--help"};
+    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
 }
 
 TEST_F(CLITest, CreateHelpShortOption)
 {
-    const char* argv[] = {"FelzTrace", "create", "-h"};
-    felztrace::ReturnCode result = felztrace::parseCli(3, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "-h"};
+    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
 }
 
 TEST_F(CLITest, CreateMissingNameAndPath)
 {
-    const char* argv[] = {"FelzTrace", "create"};
-    felztrace::ReturnCode result = felztrace::parseCli(2, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init"};
+    felztrace::ReturnCode result = felztrace::parseCli(3, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Error);
     EXPECT_FALSE(store.createCalled);
@@ -163,8 +174,8 @@ TEST_F(CLITest, CreateMissingNameAndPath)
 
 TEST_F(CLITest, CreateMissingPath)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName"};
-    felztrace::ReturnCode result = felztrace::parseCli(3, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName"};
+    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Error);
     EXPECT_FALSE(store.createCalled);
@@ -172,8 +183,8 @@ TEST_F(CLITest, CreateMissingPath)
 
 TEST_F(CLITest, CreateMissingLevel)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path"};
-    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName", "./store-path"};
+    felztrace::ReturnCode result = felztrace::parseCli(5, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Error);
     EXPECT_FALSE(store.createCalled);
@@ -181,8 +192,8 @@ TEST_F(CLITest, CreateMissingLevel)
 
 TEST_F(CLITest, CreateInvalidLevel)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "not-a-number"};
-    felztrace::ReturnCode result = felztrace::parseCli(5, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName", "./store-path", "not-a-number"};
+    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Error);
     EXPECT_FALSE(store.createCalled);
@@ -190,8 +201,8 @@ TEST_F(CLITest, CreateInvalidLevel)
 
 TEST_F(CLITest, CreateSuccess)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "3"};
-    felztrace::ReturnCode result = felztrace::parseCli(5, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName", "./store-path", "3"};
+    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
     EXPECT_TRUE(store.createCalled);
@@ -202,8 +213,8 @@ TEST_F(CLITest, CreateSuccess)
 
 TEST_F(CLITest, CreateSuccessWithNegativeLevel)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "-2"};
-    felztrace::ReturnCode result = felztrace::parseCli(5, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName", "./store-path", "-2"};
+    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
     EXPECT_TRUE(store.createCalled);
@@ -214,13 +225,52 @@ TEST_F(CLITest, CreateSuccessWithNegativeLevel)
 
 TEST_F(CLITest, CreateThenVerbose)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "1", "-v"};
-    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName", "./store-path", "1", "-v"};
+    felztrace::ReturnCode result = felztrace::parseCli(7, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
     EXPECT_TRUE(store.createCalled);
     EXPECT_EQ(store.lastLevel, 1);
     EXPECT_EQ(spdlog::get_level(), spdlog::level::debug);
+}
+
+TEST_F(CLITest, CreateTestHelpLongOption)
+{
+    const char* argv[] = {"FelzTrace", "tests", "init", "--help"};
+    felztrace::ReturnCode result = felztrace::parseCli(4, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Success);
+    EXPECT_FALSE(store.createTestCalled);
+}
+
+TEST_F(CLITest, CreateTestMissingLevel)
+{
+    const char* argv[] = {"FelzTrace", "tests", "init", "storeName", "./store-path"};
+    felztrace::ReturnCode result = felztrace::parseCli(5, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Error);
+    EXPECT_FALSE(store.createTestCalled);
+}
+
+TEST_F(CLITest, CreateTestSuccess)
+{
+    const char* argv[] = {"FelzTrace", "tests", "init", "testStore", "./tests-path", "5"};
+    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Success);
+    EXPECT_TRUE(store.createTestCalled);
+    EXPECT_EQ(store.lastTestName, "testStore");
+    EXPECT_EQ(store.lastTestPath, "./tests-path");
+    EXPECT_EQ(store.lastTestLevel, 5);
+}
+
+TEST_F(CLITest, CreateTestWithInvalidTrailingOption)
+{
+    const char* argv[] = {"FelzTrace", "tests", "init", "testStore", "./tests-path", "5", "--typo"};
+    felztrace::ReturnCode result = felztrace::parseCli(7, argv, store);
+
+    EXPECT_EQ(result, felztrace::ReturnCode::Error);
+    EXPECT_FALSE(store.createTestCalled);
 }
 
 TEST_F(CLITest, DeleteHelpLongOption)
@@ -297,8 +347,8 @@ TEST_F(CLITest, DeleteSuccessWithUppercaseY)
 
 TEST_F(CLITest, CreateWithInvalidTrailingOption)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "1", "--typo"};
-    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName", "./store-path", "1", "--typo"};
+    felztrace::ReturnCode result = felztrace::parseCli(7, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Error);
     EXPECT_FALSE(store.createCalled);
@@ -306,8 +356,9 @@ TEST_F(CLITest, CreateWithInvalidTrailingOption)
 
 TEST_F(CLITest, CreateWithValidTrailingVerbose)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "1", "--verbose"};
-    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+    const char* argv[] = {"FelzTrace",    "reqs", "init",     "storeName",
+                          "./store-path", "1",    "--verbose"};
+    felztrace::ReturnCode result = felztrace::parseCli(7, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
     EXPECT_TRUE(store.createCalled);
@@ -316,8 +367,8 @@ TEST_F(CLITest, CreateWithValidTrailingVerbose)
 
 TEST_F(CLITest, CreateWithValidTrailingQuiet)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path", "2", "--quiet"};
-    felztrace::ReturnCode result = felztrace::parseCli(6, argv, store);
+    const char* argv[] = {"FelzTrace", "reqs", "init", "storeName", "./store-path", "2", "--quiet"};
+    felztrace::ReturnCode result = felztrace::parseCli(7, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Success);
     EXPECT_TRUE(store.createCalled);
@@ -326,9 +377,9 @@ TEST_F(CLITest, CreateWithValidTrailingQuiet)
 
 TEST_F(CLITest, CreateWithMultipleInvalidTrailingOptions)
 {
-    const char* argv[] = {"FelzTrace", "create", "storeName", "./store-path",
-                          "1",         "-v",     "--invalid"};
-    felztrace::ReturnCode result = felztrace::parseCli(7, argv, store);
+    const char* argv[] = {"FelzTrace",    "reqs", "init", "storeName",
+                          "./store-path", "1",    "-v",   "--invalid"};
+    felztrace::ReturnCode result = felztrace::parseCli(8, argv, store);
 
     EXPECT_EQ(result, felztrace::ReturnCode::Error);
     EXPECT_FALSE(store.createCalled);

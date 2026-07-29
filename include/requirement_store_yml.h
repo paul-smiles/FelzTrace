@@ -10,6 +10,12 @@
 namespace felztrace
 {
 
+enum class StoreType
+{
+    Requirements,
+    Tests
+};
+
 class RequirementStoreYml : public RequirementStore
 {
   private:
@@ -18,7 +24,7 @@ class RequirementStoreYml : public RequirementStore
         std::string storeName;
         std::string path;
         int level;
-        std::string storeType;
+        StoreType storeType;
     };
     std::unique_ptr<IFilesystem> m_filesystem;
     void createStore(const StoreSettings& storeSettings);
@@ -29,7 +35,8 @@ class RequirementStoreYml : public RequirementStore
 
     void createRequirementStore(const std::string& name, const std::string& path,
                                 int level) override;
-    void deleteRequirementStore(const std::string& name) override;
+    void createTestStore(const std::string& name, const std::string& path, int level) override;
+    void deleteStore(const std::string& name) override;
     // void addRequirement(const std::string& storeName) override;
 };
 

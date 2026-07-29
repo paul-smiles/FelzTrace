@@ -2,6 +2,8 @@
 #include <filesystem>
 #include <fstream>
 #include <spdlog/spdlog.h>
+#include <stdexcept>
+#include <string_view>
 #include <system_error>
 #include <yaml-cpp/yaml.h>
 
@@ -11,6 +13,20 @@ namespace felztrace
 namespace
 {
 constexpr std::string_view configFilename = ".felztrace.yml";
+
+std::string_view storeTypeToString(StoreType storeType)
+{
+    switch (storeType)
+    {
+    case StoreType::Requirements:
+        return "reqs";
+    case StoreType::Tests:
+        return "tests";
+    default:
+        spdlog::error("Unsupported store type value in storeTypeToString");
+        throw std::invalid_argument("Unsupported store type");
+    }
+}
 // void generateRequirement(const std::string& storeName, const std::filesystem::path& storePath,
 //                          IFilesystem* filesystem)
 // {
@@ -51,14 +67,23 @@ RequirementStoreYml::RequirementStoreYml(std::unique_ptr<IFilesystem> filesystem
 void RequirementStoreYml::createRequirementStore(const std::string& name, const std::string& path,
                                                  int level)
 {
-    StoreSettings storeSettings{name, path, level, "requirements"};
+    StoreSettings storeSettings{name, path, level, StoreType::Requirements};
+    createStore(storeSettings);
+}
+
+void RequirementStoreYml::createTestStore(const std::string& name, const std::string& path,
+                                          int level)
+{
+    StoreSettings storeSettings{name, path, level, StoreType::Tests};
     createStore(storeSettings);
 }
 
 void RequirementStoreYml::createStore(const StoreSettings& storeSettings)
 {
-    spdlog::info("Creating \nstore: '{}'\npath: '{}'\nlevel: {}", storeSettings.storeName,
-                 storeSettings.path, storeSettings.level);
+    const std::string storeTypeName{storeTypeToString(storeSettings.storeType)};
+
+    spdlog::info("Creating \nstore: '{}'\ntype: '{}'\npath: '{}'\nlevel: {}",
+                 storeSettings.storeName, storeTypeName, storeSettings.path, storeSettings.level);
 
     std::filesystem::path gitRoot = m_filesystem->findGitRoot(storeSettings.path);
 
@@ -75,7 +100,7 @@ void RequirementStoreYml::createStore(const StoreSettings& storeSettings)
         if (existingNode["store"] &&
             existingNode["store"].as<std::string>() == storeSettings.storeName)
         {
-            throw std::runtime_error("Requirement store with storeName '" +
+            throw std::runtime_error(storeTypeName + " store with storeName '" +
                                      storeSettings.storeName + "' already exists at path '" +
                                      yamlPath.string() + "'");
         }
@@ -88,25 +113,26 @@ void RequirementStoreYml::createStore(const StoreSettings& storeSettings)
     // Guard against creating stores at git root
     if (m_filesystem->equivalent(storePath, gitRoot))
     {
-        throw std::runtime_error("Cannot create requirement store at git root '" +
+        throw std::runtime_error("Cannot create " + storeTypeName + " store at git root '" +
                                  storePath.string() +
-                                 "'. Requirement stores must be in a subdirectory to prevent "
+                                 "'. Stores must be in a subdirectory to prevent "
                                  "accidental deletion of the repository.");
     }
 
     // Guard against creating stores in directories containing .git
     if (m_filesystem->exists(storePath / ".git"))
     {
-        throw std::runtime_error(
-            "Cannot create requirement store at '" + storePath.string() +
-            "': directory contains .git repository. Requirement stores must be in a subdirectory.");
+        throw std::runtime_error("Cannot create " + storeTypeName + " store at '" +
+                                 storePath.string() +
+                                 "': directory contains .git repository. Stores must be in a "
+                                 "subdirectory.");
     }
 
     std::filesystem::path yamlFilePath =
         m_filesystem->weakly_canonical(std::filesystem::path(storeSettings.path) / configFilename);
     if (m_filesystem->exists(yamlFilePath))
     {
-        throw std::filesystem::filesystem_error("Requirement store YAML file already exists",
+        throw std::filesystem::filesystem_error(storeTypeName + " store YAML file already exists",
                                                 yamlFilePath,
                                                 std::make_error_code(std::errc::file_exists));
     }
@@ -115,8 +141,8 @@ void RequirementStoreYml::createStore(const StoreSettings& storeSettings)
     m_filesystem->create_directories(storeSettings.path, errorCode);
     if (errorCode)
     {
-        throw std::filesystem::filesystem_error("Error creating requirement store directory",
-                                                storeSettings.path, errorCode);
+        throw std::filesystem::filesystem_error(
+            "Error creating " + storeTypeName + " store directory", storeSettings.path, errorCode);
     }
 
     spdlog::debug("Directory created, write yaml configuration file.");
@@ -124,18 +150,18 @@ void RequirementStoreYml::createStore(const StoreSettings& storeSettings)
     // Update storeName with the provided name
     YAML::Node storeSettingsNode;
     storeSettingsNode["store"] = storeSettings.storeName;
-    storeSettingsNode["settings"]["type"] = storeSettings.storeType;
+    storeSettingsNode["settings"]["type"] = storeTypeName;
     storeSettingsNode["settings"]["level"] = storeSettings.level;
 
     m_filesystem->writeFile(yamlFilePath, YAML::Dump(storeSettingsNode) + "\n");
 
-    spdlog::info("Requirement store '{}' created successfully at '{}'", storeSettings.storeName,
+    spdlog::info("Store '{}' created successfully at '{}'", storeSettings.storeName,
                  yamlFilePath.string());
 }
 
-void RequirementStoreYml::deleteRequirementStore(const std::string& name)
+void RequirementStoreYml::deleteStore(const std::string& name)
 {
-    spdlog::info("Deleting requirement store '{}'", name);
+    spdlog::info("Deleting store '{}'", name);
 
     std::filesystem::path gitRoot = m_filesystem->findGitRoot(std::filesystem::current_path());
     spdlog::debug("Searching for .felztrace.yml file with matching storeName in settings starting "
@@ -157,33 +183,30 @@ void RequirementStoreYml::deleteRequirementStore(const std::string& name)
             // Guard against deleting git root or any directory containing .git
             if (m_filesystem->exists(storeDir / ".git"))
             {
-                throw std::runtime_error("Cannot delete requirement store at '" +
-                                         storeDir.string() +
-                                         "': directory contains .git repository. Requirement "
-                                         "stores must be in a subdirectory.");
+                throw std::runtime_error("Cannot delete store at '" + storeDir.string() +
+                                         "': directory contains .git repository. Stores must be "
+                                         "in a subdirectory.");
             }
 
             // Additional safety: check if store directory is the git root
             if (m_filesystem->equivalent(storeDir, gitRoot))
             {
-                throw std::runtime_error("Cannot delete requirement store at git root '" +
-                                         storeDir.string() +
-                                         "'. Requirement stores must be in a subdirectory.");
+                throw std::runtime_error("Cannot delete store at git root '" + storeDir.string() +
+                                         "'. Stores must be in a subdirectory.");
             }
 
             std::error_code errorCode;
             m_filesystem->remove_all(storeDir, errorCode);
             if (errorCode)
             {
-                throw std::filesystem::filesystem_error(
-                    "Error deleting requirement store YAML file", yamlPath, errorCode);
+                throw std::filesystem::filesystem_error("Error deleting store YAML file", yamlPath,
+                                                        errorCode);
             }
-            spdlog::info("Requirement store '{}' deleted successfully", name);
+            spdlog::info("Store '{}' deleted successfully", name);
             return;
         }
     }
-    spdlog::warn("Requirement store '{}' not found in any .felztrace.yml file, nothing to delete",
-                 name);
+    spdlog::warn("Store '{}' not found in any .felztrace.yml file, nothing to delete", name);
 }
 
 // void RequirementStoreYml::addRequirement(const std::string& storeName)

@@ -131,7 +131,39 @@ TEST_F(RequirementStoreTest, WritesYamlFileWithCorrectSettings)
 
     YAML::Node root = YAML::Load(yamlContent);
     EXPECT_EQ(root["store"].as<std::string>(), "testName");
-    EXPECT_EQ(root["settings"]["type"].as<std::string>(), "requirements");
+    EXPECT_EQ(root["settings"]["type"].as<std::string>(), "reqs");
+    EXPECT_EQ(root["settings"]["level"].as<int>(), 2);
+}
+
+// Unit Test: Writes YAML file with type set to tests for test stores
+TEST_F(RequirementStoreTest, WritesYamlFileWithTestStoreType)
+{
+    std::filesystem::path storePath = "/project/tests";
+    std::filesystem::path gitRoot = "/project";
+    std::string yamlContent;
+
+    EXPECT_CALL(*mockFsPtr, findGitRoot(storePath)).WillOnce(Return(gitRoot));
+    EXPECT_CALL(*mockFsPtr, listFilesWithExtensionAndName(_, _, _))
+        .WillOnce(Return(std::vector<std::filesystem::path>{}));
+
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath)).WillOnce(Return(storePath));
+    EXPECT_CALL(*mockFsPtr, equivalent(storePath, gitRoot)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, weakly_canonical(storePath / CONFIG_FILENAME))
+        .WillOnce(Return(storePath / CONFIG_FILENAME));
+    EXPECT_CALL(*mockFsPtr, exists(storePath / CONFIG_FILENAME)).WillOnce(Return(false));
+    EXPECT_CALL(*mockFsPtr, create_directories(_, _))
+        .WillOnce(DoAll(SetArgReferee<1>(std::error_code()), Return(true)));
+
+    EXPECT_CALL(*mockFsPtr, writeFile(storePath / CONFIG_FILENAME, _))
+        .WillOnce(SaveArg<1>(&yamlContent));
+
+    RequirementStoreYml store(std::move(mockFs));
+    store.createTestStore("test-store", storePath.string(), 2);
+
+    YAML::Node root = YAML::Load(yamlContent);
+    EXPECT_EQ(root["store"].as<std::string>(), "test-store");
+    EXPECT_EQ(root["settings"]["type"].as<std::string>(), "tests");
     EXPECT_EQ(root["settings"]["level"].as<int>(), 2);
 }
 
@@ -301,7 +333,7 @@ TEST_F(RequirementStoreTest, DeletesStoreWhenExists)
         .WillOnce(DoAll(SetArgReferee<1>(std::error_code()), Return()));
 
     RequirementStoreYml store(std::move(mockFs));
-    EXPECT_NO_THROW(store.deleteRequirementStore("mystore"));
+    EXPECT_NO_THROW(store.deleteStore("mystore"));
 }
 
 // Unit Test: Does nothing when no matching store exists
@@ -316,7 +348,7 @@ TEST_F(RequirementStoreTest, DoesNothingWhenStoreDoesNotExist)
     EXPECT_CALL(*mockFsPtr, remove_all(_, _)).Times(0);
 
     RequirementStoreYml store(std::move(mockFs));
-    EXPECT_NO_THROW(store.deleteRequirementStore("mystore"));
+    EXPECT_NO_THROW(store.deleteStore("mystore"));
 }
 
 // Unit Test: Does nothing when discovered stores do not match requested name
@@ -334,7 +366,7 @@ TEST_F(RequirementStoreTest, DoesNothingWhenStoreNameDoesNotMatch)
     EXPECT_CALL(*mockFsPtr, remove_all(_, _)).Times(0);
 
     RequirementStoreYml store(std::move(mockFs));
-    EXPECT_NO_THROW(store.deleteRequirementStore("mystore"));
+    EXPECT_NO_THROW(store.deleteStore("mystore"));
 }
 
 // Unit Test: Checks multiple discovered stores and deletes the matching one
@@ -354,7 +386,7 @@ TEST_F(RequirementStoreTest, DeletesMatchingStoreAmongMultipleCandidates)
         .WillOnce(DoAll(SetArgReferee<1>(std::error_code()), Return()));
 
     RequirementStoreYml store(std::move(mockFs));
-    EXPECT_NO_THROW(store.deleteRequirementStore("mystore"));
+    EXPECT_NO_THROW(store.deleteStore("mystore"));
 }
 
 // Unit Test: Throws when remove_all fails
@@ -377,7 +409,7 @@ TEST_F(RequirementStoreTest, ThrowsWhenRemoveAllFails)
             DoAll(SetArgReferee<1>(std::make_error_code(std::errc::permission_denied)), Return()));
 
     RequirementStoreYml store(std::move(mockFs));
-    EXPECT_THROW(store.deleteRequirementStore("mystore"), std::filesystem::filesystem_error);
+    EXPECT_THROW(store.deleteStore("mystore"), std::filesystem::filesystem_error);
 }
 
 TEST_F(RequirementStoreTest, ThrowsWhenCreatingStoreAtGitRoot)
@@ -431,7 +463,7 @@ TEST_F(RequirementStoreTest, ThrowsWhenDeletingStoreAtGitRoot)
     EXPECT_CALL(*mockFsPtr, equivalent(gitRoot, gitRoot)).WillOnce(Return(true));
 
     RequirementStoreYml store(std::move(mockFs));
-    EXPECT_THROW(store.deleteRequirementStore("mystore"), std::runtime_error);
+    EXPECT_THROW(store.deleteStore("mystore"), std::runtime_error);
 }
 
 TEST_F(RequirementStoreTest, ThrowsWhenDeletingStoreInDirectoryWithGit)
@@ -450,5 +482,5 @@ TEST_F(RequirementStoreTest, ThrowsWhenDeletingStoreInDirectoryWithGit)
     EXPECT_CALL(*mockFsPtr, exists(storePath / ".git")).WillOnce(Return(true));
 
     RequirementStoreYml store(std::move(mockFs));
-    EXPECT_THROW(store.deleteRequirementStore("mystore"), std::runtime_error);
+    EXPECT_THROW(store.deleteStore("mystore"), std::runtime_error);
 }
